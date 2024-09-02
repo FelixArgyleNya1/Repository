@@ -1,37 +1,42 @@
-import hikka
+from .. import loader, utils
 
-@hikka.on_message(filters.command('user'))
-async def user_info_command(client, message):
-    try:
-        user_id = int(message.text.split(' ', 1)[1])
-    except (IndexError, ValueError):
-        await message.reply("Будь ласка, вкажіть коректний ID користувача.")
-        return
+class UserInfoMod(loader.Module):
+    """Get information about a user and their public chats"""
+    strings = {"name": "UserInfo"}
 
-    try:
-        user = await client.get_users(user_id)
-        user_info = {
-            'id': user.id,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'username': user.username,
-            'phone': user.phone if user.phone else "Немає",
-            'bio': user.bio if user.bio else "Немає"
-        }
+    async def client_ready(self, client, db):
+        self.client = client
 
-        dialogs = await client.get_dialogs()
-        public_chats = [dialog.name for dialog in dialogs if dialog.is_group]
+    @loader.owner
+    async def usercmd(self, message):
+        """Get user information and public chats"""
+        args = utils.get_args(message)
+        if len(args) != 1:
+            await message.edit("<b>Usage: .user <user_id></b>")
+            return
 
-        user_info_str = (f"ID: {user_info['id']}\n"
-                         f"First Name: {user_info['first_name']}\n"
-                         f"Last Name: {user_info['last_name']}\n"
-                         f"Username: {user_info['username']}\n"
-                         f"Phone: {user_info['phone']}\n"
-                         f"Bio: {user_info['bio']}")
+        user_id = args[0]
 
-        public_chats_str = "\n".join(public_chats) if public_chats else "Не знайдено публічних чатів"
+        # Get user information
+        try:
+            user_info = await self.client.get_users(user_id)
+            user_info_str = (f"ID: {user_info.id}\n"
+                             f"First Name: {user_info.first_name}\n"
+                             f"Last Name: {user_info.last_name}\n"
+                             f"Username: {user_info.username}\n"
+                             f"Phone: {user_info.phone if user_info.phone else 'Not Available'}\n"
+                             f"Bio: {user_info.bio if user_info.bio else 'Not Available'}")
+        except Exception as e:
+            user_info_str = f"Failed to get user info: {str(e)}"
 
-        await message.reply(f"User Info:\n{user_info_str}\n\nPublic Chats:\n{public_chats_str}")
+        # Get public chats
+        try:
+            dialogs = await self.client.get_dialogs()
+            public_chats = [dialog.name for dialog in dialogs if dialog.is_group]
+            public_chats_str = "\n".join(public_chats) if public_chats else "No public chats found."
+        except Exception as e:
+            public_chats_str = f"Failed to get public chats: {str(e)}"
 
-    except Exception as e:
-        await message.reply(f"Не вдалося отримати інформацію про користувача: {str(e)}")
+        # Send response
+        response = f"User Info:\n{user_info_str}\n\nPublic Chats:\n{public_chats_str}"
+        await message.reply(response)
