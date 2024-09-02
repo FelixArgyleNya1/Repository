@@ -1,4 +1,4 @@
-from hikka import hikka, filters
+import hikka, filters
 
 @hikka.on_message(filters.command('user'))
 async def user_info_command(client, message):
